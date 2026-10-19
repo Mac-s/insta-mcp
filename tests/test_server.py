@@ -187,17 +187,22 @@ async def test_list_new_comments_skips_own_replies_without_username(settings):
     respx.get(f"{G}/me").mock(return_value=httpx.Response(200, json={
         "user_id": "17840000000000001", "username": "my_shop", "id": "999"}))
     respx.get(f"{G}/me/media").mock(return_value=httpx.Response(200, json={"data": [
-        {"id": "M1", "comments_count": 2, "permalink": "https://x/p/1", "caption": "c"}]}))
+        {"id": "M1", "comments_count": 3, "permalink": "https://x/p/1", "caption": "c"}]}))
     respx.get(f"{G}/M1/comments").mock(return_value=httpx.Response(200, json={"data": [
         {"id": "C1", "text": "Prix ?", "timestamp": "2026-10-19T09:00:00+0000",
          "username": "a_customer", "from": {"id": "1000000000000002", "username": "a_customer"},
          "replies": {"data": [
              {"id": "R1", "text": "Check tes DM !", "timestamp": "2026-10-19T09:00:05+0000",
-              "user": {"id": "17840000000000001"}}]}},
+              "user": {"id": "17840000000000001"}},
+             {"id": "R2", "text": "Lien en DM", "timestamp": "2026-10-19T09:00:06+0000"},
+             {"id": "R3", "text": "Merci !", "timestamp": "2026-10-19T09:01:00+0000"}]}},
+        # Graph also lists the account's own reply at the top level, with `from`.
+        {"id": "R2", "text": "Lien en DM", "timestamp": "2026-10-19T09:00:06+0000",
+         "username": "my_shop", "from": {"id": "17840000000000001", "username": "my_shop"}},
     ]}))
     data = _out(await build_server(settings).call_tool(
         "list_new_comments", {"since": "2026-10-18T00:00:00Z"}))
-    assert [c["comment_id"] for c in data] == ["C1"]
+    assert [c["comment_id"] for c in data] == ["C1", "R3"]
 
 
 @respx.mock

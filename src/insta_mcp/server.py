@@ -141,16 +141,21 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
         for m in media.get("data", []):
             if not m.get("comments_count"):
                 continue
-            for c in await graph.paginate(f"{m['id']}/comments", fields=COMMENT_FIELDS, limit=50):
+            comments = await graph.paginate(f"{m['id']}/comments", fields=COMMENT_FIELDS,
+                                            limit=50)
+            # Nested replies come back without `from`/`username`, but the account's own
+            # replies are also listed at the top level with a full `from`: collect their
+            # ids so our replies (e.g. OpenReply's automatic ones) are never reported.
+            own_ids = {c["id"] for c in comments
+                       if c.get("user") or is_me(c.get("from"), c.get("username"), ident)}
+            for c in comments:
                 thread = [c] + [{**r, "parent_id": c["id"]} for r in
                                 (c.get("replies") or {}).get("data", [])]
                 for item in thread:
                     if parse_time(item["timestamp"]) <= cutoff:
                         continue
-                    # Graph only returns `user` when the comment was written by the
-                    # account itself; `username`/`from` are often missing on our own
-                    # replies (e.g. OpenReply's automatic ones).
-                    if item.get("user") or is_me(item.get("from"), item.get("username"), ident):
+                    if (item["id"] in own_ids or item.get("user")
+                            or is_me(item.get("from"), item.get("username"), ident)):
                         continue
                     found.append({
                         "comment_id": item["id"],
