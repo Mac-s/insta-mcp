@@ -10,9 +10,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
-RUN pip install . \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tzdata \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install . \
  && useradd --system --uid 10001 --no-create-home app \
  && mkdir -p /data && chown app /data
+
+# Runs as uid 10001 by default; `user: "$PUID:$PGID"` in compose works too,
+# as long as the /data volume belongs to that user.
 
 USER app
 VOLUME ["/data"]
