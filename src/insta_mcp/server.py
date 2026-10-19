@@ -25,8 +25,8 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 MEDIA_FIELDS = "id,caption,media_type,permalink,timestamp,comments_count,like_count"
 COMMENT_FIELDS = (
-    "id,text,timestamp,username,from,like_count,hidden,"
-    "replies{id,text,timestamp,username,from}"
+    "id,text,timestamp,username,from,user,like_count,hidden,"
+    "replies{id,text,timestamp,username,from,user}"
 )
 MESSAGE_FIELDS = "id,created_time,from,to,message"
 DM_MAX_CHARS = 1000
@@ -146,7 +146,10 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
                 for item in thread:
                     if parse_time(item["timestamp"]) <= cutoff:
                         continue
-                    if is_me(item.get("from"), item.get("username"), ident):
+                    # Graph only returns `user` when the comment was written by the
+                    # account itself; `username`/`from` are often missing on our own
+                    # replies (e.g. OpenReply's automatic ones).
+                    if item.get("user") or is_me(item.get("from"), item.get("username"), ident):
                         continue
                     found.append({
                         "comment_id": item["id"],
