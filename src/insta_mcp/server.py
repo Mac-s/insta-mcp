@@ -166,7 +166,8 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
 
     @tool
     async def reply_to_comment(comment_id: str, message: str) -> dict[str, Any]:
-        """Répond publiquement à un commentaire. À n'appeler qu'avec l'accord du propriétaire (au cas par cas ou permanent)."""
+        """Répond publiquement à un commentaire. À n'appeler qu'avec l'accord du
+        propriétaire (au cas par cas ou permanent)."""
         if not message.strip():
             raise ValueError("message vide")
         return await graph.post(f"{comment_id}/replies", message=message)
