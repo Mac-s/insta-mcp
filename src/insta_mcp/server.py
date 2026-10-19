@@ -25,8 +25,8 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 MEDIA_FIELDS = "id,caption,media_type,permalink,timestamp,comments_count,like_count"
 COMMENT_FIELDS = (
-    "id,text,timestamp,username,from,like_count,hidden,"
-    "replies{id,text,timestamp,username,from}"
+    "id,text,timestamp,username,from,user,like_count,hidden,"
+    "replies{id,text,timestamp,username,from,user}"
 )
 MESSAGE_FIELDS = "id,created_time,from,to,message"
 DM_MAX_CHARS = 1000
@@ -54,8 +54,9 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
         "insta-mcp",
         instructions=(
             "Outils pour le compte Instagram professionnel du propriétaire : lire et répondre "
-            "aux commentaires et messages privés, lire les statistiques. Ne publie jamais de "
-            "réponse sans la validation explicite du propriétaire."
+            "aux commentaires et messages privés, lire les statistiques. N'envoie une réponse "
+            "qu'avec l'accord du propriétaire : validation au cas par cas, ou autorisation "
+            "permanente qu'il a donnée pour un type de réponse."
         ),
         auth_server_provider=provider,
         auth=AuthSettings(
@@ -146,7 +147,10 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
                 for item in thread:
                     if parse_time(item["timestamp"]) <= cutoff:
                         continue
-                    if is_me(item.get("from"), item.get("username"), ident):
+                    # Graph only returns `user` when the comment was written by the
+                    # account itself; `username`/`from` are often missing on our own
+                    # replies (e.g. OpenReply's automatic ones).
+                    if item.get("user") or is_me(item.get("from"), item.get("username"), ident):
                         continue
                     found.append({
                         "comment_id": item["id"],
@@ -162,7 +166,8 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
 
     @tool
     async def reply_to_comment(comment_id: str, message: str) -> dict[str, Any]:
-        """Répond publiquement à un commentaire. À n'appeler qu'après validation du propriétaire."""
+        """Répond publiquement à un commentaire. À n'appeler qu'avec l'accord du
+        propriétaire (au cas par cas ou permanent)."""
         if not message.strip():
             raise ValueError("message vide")
         return await graph.post(f"{comment_id}/replies", message=message)
@@ -228,7 +233,7 @@ def build_server(settings: Settings, http: httpx.AsyncClient | None = None) -> F
     @tool
     async def send_dm(recipient_id: str, text: str) -> dict[str, Any]:
         """Envoie une réponse en message privé (fenêtre de 24 h après le dernier message de la
-        personne). À n'appeler qu'après validation du propriétaire."""
+        personne). À n'appeler qu'avec l'accord du propriétaire (au cas par cas ou permanent)."""
         if not text.strip():
             raise ValueError("message vide")
         if len(text) > DM_MAX_CHARS:
