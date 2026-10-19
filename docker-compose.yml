@@ -1,0 +1,23 @@
+# Standalone example. To add insta-mcp to an existing stack, copy the service
+# block into your own docker-compose.yml and the variables into its .env.
+services:
+  insta-mcp:
+    image: ghcr.io/mac-s/insta-mcp:latest
+    container_name: insta-mcp
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: "${INSTA_MCP_PUBLIC_URL}"
+      IG_ACCESS_TOKEN: "${INSTA_MCP_IG_TOKEN}"
+      MCP_ADMIN_PASSWORD: "${INSTA_MCP_ADMIN_PASSWORD}"
+    volumes:
+      # Must be writable by uid 10001: mkdir -p insta-mcp && sudo chown 10001 insta-mcp
+      - ./insta-mcp:/data
+    ports:
+      - "127.0.0.1:8010:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
